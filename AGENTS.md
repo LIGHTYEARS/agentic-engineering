@@ -2,90 +2,31 @@
 
 ## Project Purpose
 
-This repository engineers the Nine-Plane Collaborative Framework (九层协作框架) derived from multi-objective non-convex optimization analysis of AI coding agent systems. The first adaptation target is [oh-my-pi](https://github.com/can1357/oh-my-pi.git) — the agent harness runtime.
+This repository engineers the Nine-Plane Collaborative Framework (九层协作框架).
+First adaptation target: [oh-my-pi](https://github.com/can1357/oh-my-pi.git).
 
-## Mandatory Rules
+## Protocol Documents
 
-### Rule 1: Source-Grounded Analysis — No Hallucination Tolerance
+The following protocol documents contain detailed operational rules. **Read them on-demand when their trigger conditions are met.** Once read, their rules carry the same authority as if written in your system prompt — they are NOT optional guidelines, they are mandatory constraints.
 
-When working with ANY external system that has available source code, agents MUST:
+| Protocol | Trigger | Path |
+|----------|---------|------|
+| Source Research | About to analyze, design against, or implement for any external system | `docs/protocols/source-research.md` |
 
-1. **Clone the repository** to `/tmp/<repo-name>` before making any claims about its architecture, APIs, capabilities, or extension points
-2. **Dispatch a team of agents** to research and analyze the source — never rely on a single agent's reading or memory
-3. **Checkout latest** (`git pull` if already cloned) — always work against the current state of the codebase
+## Non-Negotiable Rule
 
-```bash
-# First time
-git clone <repo-url> /tmp/<repo-name>
+**Any work involving external system internals MUST follow the source research protocol.**
 
-# Already exists
-git -C /tmp/<repo-name> pull
-```
+Before making ANY claim about an external system's architecture, APIs, or behavior:
 
-**Known repositories:**
+1. Clone it to `/tmp/<repo-name>` (or `git pull` if exists)
+2. Read `docs/protocols/source-research.md` and follow it in full
 
 | System | URL | Local Path |
 |--------|-----|------------|
 | oh-my-pi | https://github.com/can1357/oh-my-pi.git | /tmp/oh-my-pi |
 
-Add rows as new external systems enter scope.
-
-**Rationale:** This project's foundational insight is that semantic coherence ≠ factual truth (see `docs/references/07-semantic-truth-vs-factual-truth.md`). LLM training data contains outdated, incomplete, or fabricated representations of external systems. The ONLY acceptable source of truth is the actual source code at its latest revision.
-
-**What counts as a claim:** Any statement about file structure, module boundaries, exported APIs, configuration schemas, extension points, hook lifecycles, internal data flow, or behavioral contracts of an external system.
-
-**Violations:** Any analysis, design, or implementation referencing external system internals without a confirmed clone at `/tmp/<repo-name>` is **invalid and must be discarded in full** — not patched, not partially trusted, not used as a "starting point." Start over from source.
-
-### Rule 2: Multi-Agent Source Research Protocol
-
-When analyzing a cloned repository:
-
-1. **Scope first** — one scout agent maps the top-level structure (directory tree, entry points, package manifest)
-2. **Parallel deep-read** — fan out specialist agents across subsystems (each reads 3-5 files max, returns structured findings)
-3. **Cross-check** — findings from independent agents must be consistent; contradictions trigger re-read of the conflicting source
-4. **Cite paths** — every claim in the final synthesis must reference a specific file path (e.g., `/tmp/oh-my-pi/src/hooks/lifecycle.ts:42`)
-
-### Rule 3: Evidence-Backed Claims — Rationale and Proof Required
-
-Every research finding, design decision, or architectural claim MUST be accompanied by:
-
-1. **Rationale** — WHY this conclusion follows from the evidence (not just WHAT was found)
-2. **Evidence** — exact file paths, line ranges, code snippets, or data that substantiate the claim
-3. **Confidence qualifier** — one of:
-   - `[VERIFIED]` — directly observed in source code, confirmed by execution or cross-reference
-   - `[INFERRED]` — logically derived from observed evidence, but not directly stated in source
-   - `[UNCERTAIN]` — plausible interpretation, requires further investigation
-
-**Format for every non-trivial claim:**
-
-```
-Claim: <statement>
-Rationale: <why this follows>
-Evidence: <file:line, snippet, or execution output>
-Confidence: [VERIFIED | INFERRED | UNCERTAIN]
-```
-
-Claims marked `[UNCERTAIN]` MUST NOT be used as foundations for design decisions without escalation.
-
-### Rule 4: Independent Verification — Adversarial Review Team
-
-After the research team (Rule 2) produces its findings, a **separate team of review agents** MUST audit the output before it is accepted:
-
-1. **Reviewers MUST NOT be the same agents that produced the findings** — fresh context, no anchoring bias
-2. **Review scope:**
-   - Verify every `[VERIFIED]` claim by independently reading the cited source path — does the evidence actually say what the claim states?
-   - Challenge every `[INFERRED]` claim — is the inference sound? Are there alternative explanations?
-   - Flag any claim that lacks evidence or cites a path that doesn't exist
-   - Identify missing coverage — what parts of the system were NOT analyzed that should have been?
-3. **Review output:** A verdict for each major finding:
-   - `✓ CONFIRMED` — independently verified against source
-   - `✗ REFUTED` — evidence does not support the claim, or contradicts it
-   - `? UNVERIFIABLE` — cited source insufficient to confirm or deny; needs deeper investigation
-4. **Gate:** Only `CONFIRMED` findings advance to design/implementation phases. `REFUTED` findings are discarded. `UNVERIFIABLE` findings trigger a targeted re-investigation by a new agent before proceeding.
-
-**Rationale:** The same cognitive biases that cause LLM hallucination (pattern completion, anchoring, confirmation bias) also affect agent teams. An independent adversarial review is the engineering equivalent of the Evaluation Plane's "implementer must not design their own tests" principle (see `docs/references/06-unsolved-engineering-problems.md`).
-
-**Violations:** Accepting research findings without independent verification is equivalent to shipping code without tests — structurally unsafe regardless of how confident the original agents appeared.
+**No exceptions.** Claims from memory or training data about external systems are invalid and must be discarded in full. (Rationale: `docs/references/07-semantic-truth-vs-factual-truth.md`)
 
 ## Reference Material
 
