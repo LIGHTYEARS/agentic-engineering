@@ -12,8 +12,9 @@ The following protocol documents contain detailed operational rules. **Read them
 | Protocol | Trigger | Path |
 |----------|---------|------|
 | Source Research | About to analyze, design against, or implement for any external system | `docs/protocols/source-research.md` |
+| Runtime Verification | Local omp behavior claims | `docs/protocols/runtime-verification.md` |
 
-## Non-Negotiable Rule
+## Non-Negotiable Rules
 
 **Any work involving external system internals MUST follow the source research protocol.**
 
@@ -27,6 +28,12 @@ Before making ANY claim about an external system's architecture, APIs, or behavi
 | oh-my-pi | https://github.com/can1357/oh-my-pi.git | /tmp/oh-my-pi |
 
 **No exceptions.** Claims from memory or training data about external systems are invalid and must be discarded in full. (Rationale: `docs/references/07-semantic-truth-vs-factual-truth.md`)
+
+**Rule B:** Any claim about local omp behavior MUST cite a fresh V-N run from the Runtime Verification protocol.
+
+## Self-Maintenance
+
+Always-on = trigger + bottom line only. All HOW (paths, commands, examples, versions, forbidden-pattern lists) belongs in protocol docs. Never duplicate.
 
 ## Reference Material
 
