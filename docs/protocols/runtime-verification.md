@@ -76,7 +76,7 @@ upstream real models (c_o_new / gpt-5.4 / gemini-3.1-pro / kimi-k2.6 / glm-5.1 /
 
 ---
 
-## 3. The eight verification checks (re-runnable, exact expected output)
+## 3. The verification checks (re-runnable, exact expected output)
 
 Every command below was executed against the live binary. Copy-paste-run.
 
@@ -153,6 +153,52 @@ rm -rf "$d"
 ```
 Expected: last non-empty line is exactly `line-two`, `exit=0`. Total wall time on a warm cache is ~15–25s (dominated by upstream model latency, not omp overhead).
 
+### V-9 — Extension `tool_call` handler blocks tool execution before dispatch
+
+Proves foundation `01-governance.md` C-GOV-* runtime substrate: an extension returning `{ block, reason }` from `tool_call` intercepts the call *before* it runs, and the reason string reaches the model as the tool result.
+
+```bash
+mkdir -p /tmp/omp-v9-probe && cat > /tmp/omp-v9-probe/block-bash.ts <<'TS'
+import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+export default function v9Probe(pi: ExtensionAPI) {
+  pi.setLabel("V-9 tool_call blocker");
+  pi.on("tool_call", async (event) => {
+    if (event.toolName !== "bash") return;
+    const cmd = (event.input as { command?: string }).command ?? "";
+    if (cmd.includes("V9_SENTINEL")) return { block: true, reason: "V9_BLOCKED_BY_EXTENSION" };
+  });
+}
+TS
+d=/tmp/omp-v9-run && rm -rf "$d" && mkdir "$d"
+( cd "$d" && timeout 120 omp -p --model 'local_llm/c_o_new__dev' --approval-mode yolo --no-session \
+    -e /tmp/omp-v9-probe/block-bash.ts \
+    "Run this exact bash command using the bash tool: echo V9_SENTINEL. If the tool call fails or is blocked, reply with exactly the failure/block reason string and nothing else." ) | tail -1
+rm -rf "$d"
+```
+Expected: last line is exactly `V9_BLOCKED_BY_EXTENSION`. The command never runs (the shell never echoes `V9_SENTINEL` back through the tool result). This is a *pre-execution* block, not a post-hoc filter.
+
+### V-10 — Session-file audit persistence (append-only JSONL, resume appends)
+
+Proves foundation `01-governance.md` C-GOV-1 runtime substrate: every message pass persists to disk as a line-delimited JSON entry; resuming an existing session appends new entries without touching prior ones (append-only).
+
+```bash
+d=/tmp/omp-v10-run && sdir=/tmp/omp-v10-sessions && rm -rf "$d" "$sdir" && mkdir "$d" "$sdir"
+( cd "$d" && timeout 90 omp -p --model 'local_llm/c_o_new__dev' --approval-mode yolo \
+    --session-dir "$sdir" \
+    "Reply with exactly the token V10_TOKEN_BRAVO — nothing else." ) | tail -1
+sess=$(find "$sdir" -maxdepth 1 -name "*.jsonl" -type f | head -1)
+before_lines=$(wc -l <"$sess") ; sid=$(basename "$sess" .jsonl)
+( cd "$d" && timeout 90 omp -p --model 'local_llm/c_o_new__dev' --approval-mode yolo \
+    --session-dir "$sdir" --resume "$sid" \
+    "Reply with exactly V10_TOKEN_CHARLIE — nothing else." ) | tail -1
+after_lines=$(wc -l <"$sess")
+echo "lines: $before_lines -> $after_lines ; BRAVO count: $(grep -c V10_TOKEN_BRAVO "$sess") ; CHARLIE count: $(grep -c V10_TOKEN_CHARLIE "$sess")"
+rm -rf "$d" "$sdir"
+```
+Expected: two model outputs (`V10_TOKEN_BRAVO`, `V10_TOKEN_CHARLIE`); `lines: 8 -> 11` (±1 depending on `title`/`model_change` bookkeeping); `BRAVO count: 2` (still present after resume — proves append-only, not truncate-rewrite); `CHARLIE count: 2` (newly appended). Session filename shape is `<UTC-timestamp>_<uuid>.jsonl` (NOT `session.jsonl`).
+
+Distinct entry types observed on a minimal one-turn session: `session`, `title`, `model_change`, `message` (user + assistant), `custom_message`, `custom` — the top-level `type` field discriminates.
+
 ---
 
 ## 4. Known runtime traps
@@ -179,8 +225,8 @@ Being explicit so the doc is not overclaimed:
 
 - Does NOT verify anything about `mnemopi` (memory) beyond what shows up in `config list`.
 - Does NOT verify `swarm-extension` behavior (only that it is *loaded* per `~/.omp/config.json`).
-- Does NOT exercise the extension `tool_call` handler blocking path (`foundation/01-governance.md` C-GOV-*) — that requires writing a probe extension; deferred.
-- Does NOT exercise `pi-iso` isolation / `diff()` collection (`foundation/02-orchestration-search.md`) — nested run above uses `--no-session`, not iso mode.
-- Does NOT exercise session-file audit persistence (`foundation/01-governance.md` C-GOV-1) — would require a mutating session and post-mortem JSONL inspection.
+- Does NOT exercise `pi-iso` isolation / `diff()` collection (`foundation/02-orchestration-search.md` C-ORCH-*). Attempted a V-11 probe: overlay `--config task.isolation.mode=apfs` was accepted, `task.isolation.mode` supports `apfs` on this APFS-mounted filesystem, but the test could not reliably force the target model (`local_llm/c_o_new__dev`, a small dev model) to spawn a `task` subagent — the model wrote directly to `file.txt` in the parent workspace via the `write` tool instead. This is a **probe-design gap, not evidence against iso**: the iso path was never actually entered, so its behavior remains unverified. Re-attempt requires either (a) a probing model reliably obedient to "use the task tool", or (b) a scripted programmatic task-tool invocation not routed through model choice. Not in scope for this pass.
+- Does NOT exercise checkpoint restore (`checkpoint.enabled = false` on this workstation).
+- V-10 verifies JSONL persistence but does NOT verify the internal claim from foundation that `#entries` is never pruned — that requires forcing a compaction and inspecting `firstKeptEntryId` semantics; deferred.
 
-These are the highest-value next verification tasks; each becomes a new §3 entry when added.
+These are the highest-value next verification tasks; each becomes a new V-N entry when added, per the discipline in §2.
