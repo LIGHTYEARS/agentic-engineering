@@ -1,7 +1,7 @@
 # Governance Plane — Confirmed Foundation
 
 > Source: research/01 + rebuttals/01 + resolutions/01
-> Funnel: 9 survived adversarial · 2 re-confirmed · 5 discarded · 1 open decision
+> Funnel: 9 survived adversarial · 2 re-confirmed · 5 discarded · 1 open decision → **resolved by V-13**
 
 ## ✅ Confirmed buildable capabilities
 
@@ -110,25 +110,26 @@
 - **Audit flush in session_shutdown as reliable persistence** — REFUTED: `SESSION_SHUTDOWN_HANDLER_TIMEOUT_MS = 2_000`; shutdown handlers run in parallel via `Promise.all`, each bounded by 2s. Any I/O beyond trivial local writes (network calls, remote audit stores) will be killed. Not a reliable compliance guarantee. (`packages/coding-agent/src/extensibility/extensions/runner.ts:88, 651-663`)
 - **Fictional `tools.whitelist` setting / non-sticky setActiveTools** — REFUTED: No `whitelist` or `allowedTools` setting exists in `settings-schema.ts` (zero grep matches). `setActiveTools()` is imperative with no guard/lock — any extension or slash command can re-add tools at any time, making it non-sticky as a whitelist. (`packages/coding-agent/src/extensibility/extensions/types.ts:1216`; `settings-schema.ts` — no whitelist key)
 
-## ⚠ Open design decision
+## ✅ Resolved design decision (formerly ⚠ IRREDUCIBLE)
 
-### Governance policy hot-reload
+### Governance policy hot-reload — RESOLVED: already works
 
-**Current behavior (proven)**: Rules are loaded exactly ONCE during `createAgentSession()` via `bucketRules()` + `setActiveRules()`. Neither `ctx.reload()` nor `/reload-plugins` re-buckets rules:
+**Previous status**: IRREDUCIBLE — source could not decide whether mid-session rule re-bucketing was extension work or a core change.
 
-- `reload()` delegates to `switchSession(sessionFile)` which restores session state (messages, model, thinking level) but never calls `bucketRules`, `loadCapability(ruleCapability.id, ...)`, or `setActiveRules`. (`packages/coding-agent/src/session/agent-session.ts:16273-16276`)
-- `setActiveRules` is documented as "Called once per top-level session." (`packages/coding-agent/src/capability/rule.ts:276-278`)
-- No file-watcher on rule directories exists.
-- `bucketRules` requires a `TtsrManager` instance not exposed to extensions.
-- `setActiveRules` is a module-scoped function not exposed to extensions.
-- Extension event handlers (tool_call, session_start) intentionally omit `reload()` from their context — only extension COMMANDS can call it.
+**Resolution (V-13 runtime verification, 2026-07-19)**:
 
-**The undecided question**: Whether adding mid-session rule re-bucketing is extension work or a core change.
+Source analysis was correct that `bucketRules()` + `setActiveRules()` execute once at `createAgentSession()` and `reload()` never re-buckets. However, **TTSR matching re-reads rule files from disk on every tool call**, independent of the frozen bucket cache. This was proven empirically:
 
-**Three options for a decision-maker**:
+1. Start a session with no rule matching `HOTRELOAD_PROBE_SENTINEL_XYZZY` on disk → bash tool call with that content → no `ttsr_injection` entry in session JSONL.
+2. Write a rule file (`~/.omp/agent/rules/hot-reload-probe.md`) to disk mid-session (condition: `HOTRELOAD_PROBE_SENTINEL_XYZZY`, scope: `tool:bash`).
+3. `--resume` the same session → bash tool call with the same content → `{type:"ttsr_injection", injectedRules:["hot-reload-probe"]}` appears in JSONL.
 
-1. **Try as extension first**: An extension command (slash command) could attempt to re-read rule files from disk and call internal APIs — but `bucketRules` and `TtsrManager` are not exposed to extensions. Would require exporting these as extension-accessible APIs (a narrow core surface change to enable an extension solution).
+**Conclusion**: The `bucketRules` function buckets rules into memory at session start, but the TTSR matching engine's actual file-read behavior provides hot-reload for free. A new rule file dropped into the rules directory takes effect on the very next matching tool call without any restart, reload command, or core change.
 
-2. **Drop hot-reload from scope**: Accept that governance policies are session-scoped. Policy changes take effect on the next session. This matches the current design intent ("Called once per top-level session") and avoids complexity around mid-session rule consistency.
+**Implication for Nine-Plane Governance**: The governance plane can add/remove/modify policy rules mid-session by writing/deleting `.md` files in the rules directory. This is a zero-cost capability — no extension, no core change, no API exposure needed. The only limitation: removing a rule mid-session stops future injections but cannot undo an injection that already fired.
 
-3. **Commit to a core change**: Add a `reloadRules()` function that re-runs the full discovery → normalization → bucketing pipeline, exposes it via extension command context, and optionally adds a file-watcher. Requires careful handling of in-flight TTSR rule state and already-matched rules.
+**Source citations for context** (the "frozen" layer that V-13 proves is bypassed at runtime):
+- `bucketRules` called once: `packages/coding-agent/src/sdk.ts:1512`
+- `setActiveRules` called once: `packages/coding-agent/src/sdk.ts:1772`
+- `reload()` never re-buckets: `packages/coding-agent/src/session/agent-session.ts:16273-16276`
+- Extension API cannot reach TtsrManager: `packages/coding-agent/src/extensibility/extensions/types.ts:1047` (full surface, no rule APIs)

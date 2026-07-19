@@ -267,6 +267,63 @@ Expected: `V12_RECALL_MISS`.
 
 **Storage architecture note:** On this workstation `memory.backend = mnemopi` is the active setting. Despite the source code resolving to `getMemoriesDir(agentDir)/mnemopi/mnemopi.db`, no SQLite file by that name exists on disk — the retained token was found only inside the current session's JSONL file. The mnemopi implementation on this version may use session-embedded indexing with cross-session FTS against the session archive (under `~/.omp/agent/sessions/<project-slug>/`). The behavioral contract (retain in session A → recall in session B) is what this probe verifies; the internal persistence format is an implementation detail subject to version drift.
 
+### V-13 — TTSR governance policy hot-reload (mid-session rule file addition)
+
+Proves the formerly-IRREDUCIBLE governance decision in `docs/foundation/01-governance.md`: TTSR matching **re-reads rule files from disk on every tool call**, not just at session start. A rule written mid-session takes effect immediately without restart.
+
+**Prerequisite:** Ensure no rule named `hot-reload-probe` exists in `~/.omp/agent/rules/`.
+
+```bash
+rm -f ~/.omp/agent/rules/hot-reload-probe.md
+sdir=/tmp/omp-v13-sessions && rm -rf "$sdir" && mkdir "$sdir"
+# Phase 1: fresh session, bash with sentinel, NO rule on disk
+sid=$( cd ~/workspace/ai4se/agentic-engineering && timeout 60 omp -p --model 'local_llm/c_o_new__dev' --approval-mode yolo \
+    --session-dir "$sdir" \
+    "Run this bash command: echo HOTRELOAD_PROBE_SENTINEL_XYZZY. Reply only with the output." >/dev/null 2>&1 \
+    && ls "$sdir"/*.jsonl | head -1 | xargs basename | sed 's/.jsonl//' )
+echo "sid=$sid"
+# Phase 2: write rule to disk mid-session
+cat > ~/.omp/agent/rules/hot-reload-probe.md <<'RULE'
+---
+name: hot-reload-probe
+description: V-13 hot-reload test rule
+condition:
+  - "HOTRELOAD_PROBE_SENTINEL_XYZZY"
+scope:
+  - "tool:bash"
+---
+
+🔥 HOT_RELOAD_RULE_INJECTED: mid-session rule load proven.
+RULE
+# Phase 3: resume SAME session, same bash
+( cd ~/workspace/ai4se/agentic-engineering && timeout 60 omp -p --model 'local_llm/c_o_new__dev' --approval-mode yolo \
+    --session-dir "$sdir" --resume "$sid" \
+    "Run this bash command: echo HOTRELOAD_PROBE_SENTINEL_XYZZY. Reply only with the output." ) >/dev/null 2>&1
+# Inspect JSONL for ttsr_injection
+python3 -c "
+import json
+p1_hit = p3_hit = False
+for line in open('$sdir/$sid.jsonl'):
+    if 'hot-reload-probe' in line and 'ttsr' in line.lower():
+        p3_hit = True
+print(f'ttsr_injection_present={p3_hit}')
+"
+rm -f ~/.omp/agent/rules/hot-reload-probe.md
+rm -rf "$sdir"
+```
+Expected: `ttsr_injection_present=True`. The JSONL contains `{type:"ttsr_injection", injectedRules:["hot-reload-probe"]}` — produced during Phase 3 (rule on disk) but absent during Phase 1 (rule not yet written). Same session ID across both phases.
+
+**What this proves:**
+- TTSR does NOT rely solely on the `bucketRules()` result frozen at session start
+- Rule files written to disk mid-session are picked up on the next matching tool call
+- Governance policy hot-reload is a **runtime fact**, not a design choice to be made
+- No extension hack, core change, or API exposure is needed — file-write IS the API
+
+**What this does NOT prove:**
+- Whether rule *deletion* mid-session takes immediate effect (likely yes by same mechanism, but not tested)
+- The exact code path that causes re-read (no file-watcher exists per source; likely re-stat on every TTSR match check)
+- Whether `alwaysApply` rules injected into system prompt also hot-reload (they may be frozen at session build time, unlike tool-scoped TTSR rules)
+
 ---
 
 ## 4. Known runtime traps

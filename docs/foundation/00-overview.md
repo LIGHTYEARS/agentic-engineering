@@ -13,7 +13,7 @@ rounds then stress-tested every claim against `/tmp/oh-my-pi` source:
    infeasibility counterexamples. Discarded 25 refuted claims; surfaced 13 `? UNVERIFIABLE`.
 2. **Re-investigation** (`docs/research/resolutions/`) — 5 fresh resolvers drove those 13 to
    terminal verdicts by reading function bodies, call sites, and schemas: **9 CONFIRMED,
-   3 REFUTED, 1 IRREDUCIBLE**.
+   3 REFUTED, 1 IRREDUCIBLE** (subsequently resolved empirically — see below).
 
 This foundation spec collapses all of that into a single buildable inventory. Every entry
 is graded and cited to `/tmp/oh-my-pi` `file:line`. Nothing here is aspirational — a
@@ -32,7 +32,7 @@ graph LR
   UNV --> REINV[Re-investigation]
   REINV --> C[9 CONFIRMED]
   REINV --> D[3 REFUTED — discarded]
-  REINV --> I[1 IRREDUCIBLE — open decision]
+  REINV --> I[1 IRREDUCIBLE — resolved by V-13]
   SURV --> FDN[Confirmed Foundation]
   C --> FDN
   I --> FDN
@@ -42,12 +42,12 @@ graph LR
 
 | Plane cluster | ✅ Confirmed buildable | ❌ Gaps (net-new) | 🗑 Discarded | ⚠ Open decision | Section |
 |---|---|---|---|---|---|
-| Governance | 11 | 7 | 5 | 1 | [01](01-governance.md) |
+| Governance | 11 | 7 | 5 | 0 ★ | [01](01-governance.md) |
 | Orchestration + Search | 13 | 8 | 5 | 0 | [02](02-orchestration-search.md) |
 | Evaluation | 7 | 4 | 4 | 0 | [03](03-evaluation.md) |
 | Reality + Learning | 9 | 6 | 6 | 0 | [04](04-reality-learning.md) |
 | Spec + Decision + Delivery | 9 | 6 | 8 | 0 | [05](05-spec-decision-delivery.md) |
-| **Total** | **49** | **31** | **28** | **1** | — |
+| **Total** | **49** | **31** | **28** | **0** | — |
 
 `49 confirmed` = survived-adversarial + re-confirmed across all clusters (13
 re-confirmations of the 9 UNVERIFIABLE-CONFIRMED plus survived-scrutiny items folded in per
@@ -82,21 +82,26 @@ subagent-only).
 - **core change** — requires modifying oh-my-pi core (new event, new API surface, schema field).
 - **greenfield subsystem** — a substantially new component with no existing seam to extend.
 
-## The single open decision (Governance)
+## The former open decision (Governance) — RESOLVED
 
-One item is IRREDUCIBLE — source cannot decide it because it is a design choice, not a fact:
+One item was IRREDUCIBLE from source alone — runtime verification resolved it:
 
-**Governance policy hot-reload.** Source proves the *current* behavior: rules load once at
-`createAgentSession()`, and `reload()` restores messages/model only — it never re-buckets
-rules. So "no hot-reload" is accurate today. The undecided question is whether *adding*
-re-bucketing is extension work or a core change. Three options face the decision-maker:
+**Governance policy hot-reload.** Source analysis concluded that rules load once at
+`createAgentSession()` via `bucketRules()` + `setActiveRules()`, and `reload()` never
+re-buckets. This was accurate at the `bucketRules` layer. However, **V-13 runtime
+verification** (`docs/protocols/runtime-verification.md`) proved that **TTSR matching
+re-reads rule files from disk on every tool call**, independent of the frozen bucket
+cache. A rule written to `~/.omp/agent/rules/` mid-session is picked up on the very next
+tool call in the same session (confirmed via `--resume` with JSONL evidence:
+`{type:"ttsr_injection", injectedRules:["hot-reload-probe"]}`).
 
-1. **Try as extension first** — attempt to expose `bucketRules`/`TtsrManager` via an
-   extension; conservative, fast to attempt, may hit a wall.
-2. **Drop hot-reload from scope** — accept session-scoped policies (restart to change).
-3. **Commit to a core change** — treat re-bucketing as a first-class core capability.
+**Resolution**: Option 2 ("drop from scope") is moot — hot-reload already works at the
+TTSR matching level. The `bucketRules` cache is stale-readable but not the sole matching
+path. No core change or extension hack is needed. Governance policy hot-reload is a
+**runtime fact**, not a design choice.
 
-Detail and citations in [`01-governance.md` → Open design decision](01-governance.md).
+Detail: [`01-governance.md` → Resolved decision](01-governance.md),
+[`runtime-verification.md` → V-13](../protocols/runtime-verification.md).
 
 ## How to read this spec
 
