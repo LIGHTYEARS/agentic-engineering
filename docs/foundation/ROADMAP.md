@@ -15,31 +15,30 @@
 
 ---
 
-## Phase 1 — Immediate High-Value (13 gaps)
+## Phase 1 — Immediate High-Value (12 gaps)
 
 All have immediacy ≥ 4, priority ≥ 2.0. Can start in parallel today.
 
 | # | ID | Title | Eff | Lev | Imm | Risk | Priority | Nature |
 |---|---|---|---|---|---|---|---|---|
-| 1 | G-rl-2 | Voice-disagreement metric | 1 | 3 | 5 | 1 | **15.00** | extension |
-| 2 | G-rl-1 | Skill version history & rollback | 2 | 3 | 5 | 1 | **7.50** | extension |
-| 3 | G-orch-6 | Diversity injection for parallel search | 2 | 3 | 5 | 1 | **7.50** | extension |
-| 4 | G-GOV-1 | Formal risk grading matrix | 2 | 2 | 5 | 1 | **5.00** | extension |
-| 5 | G-orch-5 | Solution comparison/ranking before merge | 3 | 5 | 5 | 2 | **4.17** | extension |
-| 6 | G-sdd-1 | Acceptance criteria formalism | 2 | 4 | 4 | 2 | **4.00** | extension |
-| 7 | G-eval-3 | Statistical significance + regression alerting | 3 | 4 | 5 | 2 | **3.33** | extension |
-| 8 | G-rl-3 | Structured failure taxonomy | 2 | 3 | 4 | 2 | **3.00** | extension |
-| 9 | G-sdd-3 | ADR persistence | 2 | 3 | 4 | 2 | **3.00** | extension |
-| 10 | G-GOV-3 | Token/cost budget controls | 3 | 4 | 4 | 2 | **2.67** | extension+core |
-| 11 | G-orch-1 | Declarative task DAG | 3 | 4 | 4 | 2 | **2.67** | extension |
-| 12 | G-eval-2 | Adversarial input generation | 2 | 2 | 5 | 2 | **2.50** | extension |
-| 13 | G-GOV-7 | Governance policy propagation to subagents | 3 | 5 | 4 | 3 | **2.22** | core change |
+| 1 | G-rl-1 | Skill version history & rollback | 2 | 3 | 5 | 1 | **7.50** | extension |
+| 2 | G-orch-6 | Diversity injection for parallel search | 2 | 3 | 5 | 1 | **7.50** | extension |
+| 3 | G-GOV-1 | Formal risk grading matrix | 2 | 2 | 5 | 1 | **5.00** | extension |
+| 4 | G-orch-5 | Solution comparison/ranking before merge | 3 | 5 | 5 | 2 | **4.17** | extension |
+| 5 | G-sdd-1 | Acceptance criteria formalism | 2 | 4 | 4 | 2 | **4.00** | extension |
+| 6 | G-eval-3 | Statistical significance + regression alerting | 3 | 4 | 5 | 2 | **3.33** | extension |
+| 7 | G-rl-3 | Structured failure taxonomy | 2 | 3 | 4 | 2 | **3.00** | extension |
+| 8 | G-sdd-3 | ADR persistence | 2 | 3 | 4 | 2 | **3.00** | extension |
+| 9 | G-GOV-3 | Token/cost budget controls | 3 | 4 | 4 | 2 | **2.67** | extension+core |
+| 10 | G-orch-1 | Declarative task DAG | 3 | 4 | 4 | 2 | **2.67** | extension |
+| 11 | G-eval-2 | Adversarial input generation | 2 | 2 | 5 | 2 | **2.50** | extension |
+| 12 | G-GOV-7 | Governance policy propagation to subagents | 3 | 5 | 4 | 3 | **2.22** | core change |
 
 ### Phase 1 Key Insights
 
-- **Trivial wins first**: G-rl-2 is literally a one-function addition (variance over 4 numbers). G-rl-1 is SQLite journaling around an existing write. G-orch-6 is config-layer prompt variation.
 - **Gateway gaps**: G-GOV-7 (propagation) and G-orch-5 (ranking) are the two highest-leverage items — they unlock 5 and 4 downstream gaps respectively. Both are Phase 1 despite higher effort because their leverage compensates.
 - **The "start first" trio**: G-GOV-7, G-orch-5, G-orch-1 should start early even though effort=3, because Phase 2 items are blocked on them.
+- **Quick wins**: G-rl-1 (SQLite journaling around existing write), G-orch-6 (config-layer prompt variation), G-GOV-1 (scoring function in existing hook).
 
 ---
 
@@ -55,7 +54,7 @@ Blocked by one or more Phase 1 items, or priority 0.67–1.5. Start as Phase 1 d
 | 17 | G-sdd-4 | Constraint→regex TTSR auto-gen | 3 | 4 | 3 | 3 | 1.33 | G-sdd-1, G-sdd-2 |
 | 18 | G-GOV-2 | Role-based approval matrices | 3 | 3 | 3 | 3 | 1.00 | G-GOV-7 |
 | 19 | G-orch-7 | Early termination on sufficiency | 3 | 3 | 3 | 3 | 1.00 | G-orch-5 |
-| 20 | G-rl-4 | Hypothesis lifecycle tracking | 3 | 2 | 3 | 2 | 1.00 | G-rl-2, G-rl-3 |
+| 20 | G-rl-4 | Hypothesis lifecycle tracking | 3 | 2 | 3 | 2 | 1.00 | G-rl-3 |
 | 21 | G-rl-6 | Adaptive Weibull decay | 3 | 3 | 4 | 4 | 1.00 | G-rl-1 |
 | 22 | G-sdd-2 | Hard/soft constraint taxonomy | 3 | 3 | 3 | 3 | 1.00 | G-sdd-1 |
 | 23 | G-orch-4 | Query-driven context assembly | 4 | 3 | 3 | 3 | 0.75 | — |
@@ -113,8 +112,7 @@ graph TD
     EVAL1[G-eval-1 Metamorphic] --> EVAL4
 
     %% Learning chain
-    RL2[G-rl-2 Disagreement] --> RL4[G-rl-4 Hypothesis]
-    RL3[G-rl-3 Failure Tax] --> RL4
+    RL3[G-rl-3 Failure Tax] --> RL4[G-rl-4 Hypothesis]
     RL4 --> RL5[G-rl-5 Provenance DAG]
     RL1[G-rl-1 Skill Versions] --> RL6[G-rl-6 Adaptive Weibull]
 
@@ -131,7 +129,7 @@ graph TD
     classDef phase1 fill:#2d5016,stroke:#4ade80,color:#fff
     classDef phase2 fill:#7c2d12,stroke:#fb923c,color:#fff
     classDef phase3 fill:#1e1b4b,stroke:#818cf8,color:#fff
-    class GOV7,GOV3,GOV1,ORCH1,ORCH5,ORCH6,EVAL3,EVAL2,RL1,RL2,RL3,SDD1,SDD3 phase1
+    class GOV7,GOV3,GOV1,ORCH1,ORCH5,ORCH6,EVAL3,EVAL2,RL1,RL3,SDD1,SDD3 phase1
     class GOV2,GOV5,ORCH2,ORCH3,ORCH4,ORCH7,EVAL1,EVAL4,RL4,RL6,SDD2,SDD4 phase2
     class GOV4,GOV6,ORCH8,RL5,SDD5,SDD6 phase3
 ```
@@ -140,13 +138,23 @@ graph TD
 
 ## Summary Statistics
 
-| | Phase 1 | Phase 2 | Phase 3 | Total |
-|---|---|---|---|---|
-| Count | 13 | 12 | 6 | 31 |
-| Extension-only | 11 | 8 | 1 | 20 |
-| Core change required | 1 | 2 | 3 | 6 |
-| Greenfield subsystem | 1 | 2 | 2 | 5 |
-| Avg priority | 4.78 | 1.01 | 0.25 | — |
-| Sum leverage | 43 | 31 | 13 | 87 |
+| | Phase 1 | Phase 2 | Phase 3 | Deferred | Total |
+|---|---|---|---|---|---|
+| Count | 12 | 12 | 6 | 1 | 31 |
+| Extension-only | 10 | 8 | 1 | 1 | 20 |
+| Core change required | 1 | 2 | 3 | 0 | 6 |
+| Greenfield subsystem | 1 | 2 | 2 | 0 | 5 |
+| Avg priority | 4.05 | 1.01 | 0.25 | — | — |
+| Sum leverage | 40 | 31 | 13 | 3 | 87 |
 
-**Takeaway**: Phase 1 delivers 49% of total leverage with 65% extension-only items. The 3 "start-first" gateway gaps (G-GOV-7, G-orch-5, G-orch-1) alone unlock 13 downstream items.
+**Takeaway**: Phase 1 delivers 46% of total leverage with extension-only items. The 3 "start-first" gateway gaps (G-GOV-7, G-orch-5, G-orch-1) alone unlock 13 downstream items.
+
+---
+
+## Deferred — Needs Design Decision Before Implementation
+
+| ID | Title | Original Priority | Why Deferred |
+|---|---|---|---|
+| G-rl-2 | Voice-disagreement metric | 15.00 (formula artifact) | **No consumer exists.** voiceScores are Partial (most memories hit 1–2 voices, not all 4), values are RRF rank contributions (≈0.01–0.05 range, not probabilities), and absence of a voice key ≠ "disagrees" — it means "didn't see this memory." A naive variance over present scores is semantically meaningless. More critically: no downstream system would consume the metric — recall results go directly into LLM prompt with no filter/rerank hook. Build only when a concrete decision-point (e.g., uncertainty-triggered re-search, confidence-weighted prompt assembly) is designed and needs this signal. |
+
+**Lesson**: Priority=15 was a formula edge case (effort=1, risk=1 → denominator→1). Low cost does not imply high value. A cheap function with no consumer is dead code from day one.

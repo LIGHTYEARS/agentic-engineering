@@ -67,6 +67,7 @@
 - **What's missing**: Per-voice RRF scores are retained (C-rl-9) but no function computes a disagreement/divergence signal from them. Needed to trigger uncertainty-aware evidence collection
 - **Evidence of absence**: grep: zero matches for "disagreement|divergence|voice.*variance" in `packages/mnemopi/src/core/`
 - **Nature of build**: extension (pure function over existing `voiceScores` data; no schema change)
+- **⚠ Design caveat (post-review)**: voiceScores is `Partial<Record<PolyphonicVoice, number>>` — most memories are hit by 1–2 voices only; absence ≠ disagreement. Values are RRF rank contributions (`1/(60+rank)` ≈ 0.012–0.016), not probabilities. No downstream consumer (filter, rerank hook, or decision gate) currently exists to act on such a metric. **Deferred until a concrete consumer is designed.**
 
 ### G-rl-3: Structured failure taxonomy
 - **What's missing**: Failures are captured as unstructured prose via `learn` tool and memory extraction. No `failure_type`, `root_cause`, `severity`, or `resolution_pattern` fields exist anywhere in the schema
