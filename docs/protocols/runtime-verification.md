@@ -199,6 +199,38 @@ Expected: two model outputs (`V10_TOKEN_BRAVO`, `V10_TOKEN_CHARLIE`); `lines: 8 
 
 Distinct entry types observed on a minimal one-turn session: `session`, `title`, `model_change`, `message` (user + assistant), `custom_message`, `custom` — the top-level `type` field discriminates.
 
+### V-11 — `pi-iso` isolated subagent produces a git patch artifact
+
+Proves foundation `02-orchestration-search.md` C-ORCH-* runtime substrate: when a `task` subagent is spawned with `isolated: true` under `task.isolation.mode ≠ none`, it executes inside an APFS-clonefiled worktree at `~/.omp/wt/t<hash>/m` (source: `packages/coding-agent/src/task/worktree.ts:411-444`, `packages/utils/src/dirs.ts:601-603`), its diff is captured as a `.patch` file in the parent session's artifacts dir, then `merge: patch` (default) applies it via `git apply` to the real repo and destroys the worktree (source: `packages/coding-agent/src/task/isolation-runner.ts:305-341`).
+
+Two probe-design facts, both critical:
+- **`task.isolation.mode` is a schema switch, not a global gate.** Setting it to non-`none` only exposes an `isolated?: boolean` parameter on the `task` tool. The model MUST pass `isolated: true` in the tool call to enter iso (`packages/coding-agent/src/task/index.ts:596-611`, `packages/coding-agent/src/task/structured-subagent.ts:284-291`). No `isolated: true` = no iso, silently. The prompt MUST instruct the model explicitly.
+- **Parent-workspace state is NOT a valid probe.** With `merge: patch` (default), the flow is: subagent edits inside worktree → patch captured → git-apply to parent → worktree cleaned. Parent being modified is *success*, not failure. Grep the `.patch` artifact instead.
+
+```bash
+d=/tmp/omp-v11-run && sdir=/tmp/omp-v11-sessions && rm -rf "$d" "$sdir" && mkdir "$d" "$sdir"
+cat > /tmp/omp-v11-iso.yml <<'EOF'
+task:
+  isolation:
+    mode: apfs
+EOF
+( cd "$d" && git init -q \
+    && git config user.email v11@probe.local && git config user.name "V-11 Probe" \
+    && echo "hello base" > file.txt && git add file.txt && git commit -q -m base \
+    && timeout 240 omp -p --model 'local_llm/c_o_new_thinking__dev' --approval-mode yolo \
+        --session-dir "$sdir" --config /tmp/omp-v11-iso.yml \
+        "Call the task tool with parameters task='overwrite file.txt so its only content is the single line V11_ISO_EDIT (use the write tool)' and isolated=true. After the subagent finishes, reply only with V11_DONE." ) | tail -1
+patch=$(find "$sdir" -name "*.patch" | head -1)
+echo "patch_artifact_present=$([ -n "$patch" ] && echo yes || echo no)"
+grep -qF -- '-hello base' "$patch" && echo "minus_line: yes" || echo "minus_line: no"
+grep -qF -- '+V11_ISO_EDIT' "$patch" && echo "plus_line: yes"  || echo "plus_line: no"
+grep -q 'diff --git a/file.txt b/file.txt' "$patch" && echo "diff_header: yes" || echo "diff_header: no"
+rm -rf "$d" "$sdir" /tmp/omp-v11-iso.yml
+```
+Expected: last model output `V11_DONE`; `patch_artifact_present=yes`; `minus_line: yes`; `plus_line: yes`; `diff_header: yes`. The `.patch` file lives at `<session-dir>/<uuid>/<subagent-name>.patch` (subagent name is auto-generated, e.g. `SuccessfulTakin.patch`). Wall time ~130–140s (dominated by upstream thinking-model latency + iso lifecycle setup/teardown; iso overhead itself is small).
+
+**Trap**: dev/non-thinking models frequently ignore `isolated=true` and either skip the task tool entirely or drop the parameter. Use a thinking-class model. Even so, the `apply=false` variant of the tool call is unreliable across runs — models tend to omit it. Rely on the `.patch` artifact as the ground-truth signal, not on parent-file state.
+
 ---
 
 ## 4. Known runtime traps
@@ -208,6 +240,8 @@ Distinct entry types observed on a minimal one-turn session: `session`, `title`,
 - **`--model <fuzzy>` can resolve unexpectedly.** Fuzzy matching can pick a completely different provider if the string is ambiguous. Always qualify: `--model local_llm/<id>`.
 - **Public-key routes 401.** `ANTHROPIC_API_KEY` is present in env but the value is an internal token; direct-to-Anthropic calls (e.g. `--model anthropic/claude-haiku-4-5`) return `401 invalid x-api-key`. Route via `local_llm/*` (LiteLLM handles upstream credentials).
 - **Config keys are dotted paths, not YAML paths.** `omp config get modelRoles.default` does not work (`Unknown setting: modelRoles.default`). To inspect roles, read the YAML directly.
+- **Iso probes need `isolated: true` in the tool call, not just the setting.** `task.isolation.mode = apfs` alone does nothing until a `task` tool call passes `isolated: true`. Prompting "use the task tool" is not enough — the model must be told to pass the parameter, AND it must be a thinking-class model (`local_llm/c_o_new_thinking__dev` +). Small/dev models routinely skip both the tool and the parameter.
+- **Iso "success" looks like parent-file mutation.** `merge: patch` (default) applies the subagent's diff back to the real repo and destroys the worktree by design. Parent unchanged ≠ iso worked; parent changed ≠ iso failed. Grep `<session-dir>/<uuid>/*.patch` for the artifact — that is the ground truth.
 
 ---
 
@@ -225,7 +259,6 @@ Being explicit so the doc is not overclaimed:
 
 - Does NOT verify anything about `mnemopi` (memory) beyond what shows up in `config list`.
 - Does NOT verify `swarm-extension` behavior (only that it is *loaded* per `~/.omp/config.json`).
-- Does NOT exercise `pi-iso` isolation / `diff()` collection (`foundation/02-orchestration-search.md` C-ORCH-*). Attempted a V-11 probe: overlay `--config task.isolation.mode=apfs` was accepted, `task.isolation.mode` supports `apfs` on this APFS-mounted filesystem, but the test could not reliably force the target model (`local_llm/c_o_new__dev`, a small dev model) to spawn a `task` subagent — the model wrote directly to `file.txt` in the parent workspace via the `write` tool instead. This is a **probe-design gap, not evidence against iso**: the iso path was never actually entered, so its behavior remains unverified. Re-attempt requires either (a) a probing model reliably obedient to "use the task tool", or (b) a scripted programmatic task-tool invocation not routed through model choice. Not in scope for this pass.
 - Does NOT exercise checkpoint restore (`checkpoint.enabled = false` on this workstation).
 - V-10 verifies JSONL persistence but does NOT verify the internal claim from foundation that `#entries` is never pruned — that requires forcing a compaction and inspecting `firstKeptEntryId` semantics; deferred.
 
