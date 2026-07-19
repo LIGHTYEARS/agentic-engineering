@@ -231,6 +231,42 @@ Expected: last model output `V11_DONE`; `patch_artifact_present=yes`; `minus_lin
 
 **Trap**: dev/non-thinking models frequently ignore `isolated=true` and either skip the task tool entirely or drop the parameter. Use a thinking-class model. Even so, the `apply=false` variant of the tool call is unreliable across runs — models tend to omit it. Rely on the `.patch` artifact as the ground-truth signal, not on parent-file state.
 
+### V-12 — Mnemopi `retain` → cross-session `recall` round-trip + bank scoping
+
+Proves foundation `09-learning.md` runtime substrate: facts retained via `retain` are durably persisted and retrievable by a **fresh subprocess** (`--no-session`) via semantic `recall`. Per-project bank scoping ensures memory isolation across different working directories.
+
+**Prerequisite:** This probe requires a V12 token to have been retained ONCE from the target cwd. Do this manually or via the parent session before running the probe:
+```bash
+( cd ~/workspace/ai4se/agentic-engineering && timeout 60 omp -p --model 'local_llm/c_o_new__dev' \
+    --approval-mode yolo --no-session \
+    "Use the retain tool (xd://retain) with items=[{content:'V12_PROBE_TOKEN_ZYGOMORPHIC: The nine-plane framework uses zygomorphic lattice reduction as its foundational algebra. This sentence is uniquely retrievable.',context:'V-12 runtime verification probe.'}]. Reply only: V12_RETAINED." ) | tail -1
+```
+Expected: `V12_RETAINED`.
+
+**Positive probe (same cwd = same bank → HIT):**
+```bash
+( cd ~/workspace/ai4se/agentic-engineering && timeout 120 omp -p --model 'local_llm/c_o_new__dev' \
+    --approval-mode yolo --no-session \
+    "Use the recall tool (xd://recall) with query 'zygomorphic lattice reduction nine-plane algebra'. If the result contains 'V12_PROBE_TOKEN_ZYGOMORPHIC', reply with exactly: V12_RECALL_HIT. Otherwise reply: V12_RECALL_MISS." ) | tail -1
+```
+Expected: `V12_RECALL_HIT`.
+
+**Negative control (different cwd = different bank → MISS):**
+```bash
+( cd /tmp && timeout 120 omp -p --model 'local_llm/c_o_new__dev' \
+    --approval-mode yolo --no-session \
+    "Use the recall tool (xd://recall) with query 'zygomorphic lattice reduction nine-plane algebra'. If the result contains 'V12_PROBE_TOKEN_ZYGOMORPHIC', reply with exactly: V12_RECALL_HIT. Otherwise reply: V12_RECALL_MISS." ) | tail -1
+```
+Expected: `V12_RECALL_MISS`.
+
+**What this proves:**
+- `retain` writes survive process exit (not in-process-only)
+- `recall` performs semantic retrieval (the query `zygomorphic lattice reduction nine-plane algebra` is a paraphrase of the stored content, not an exact match; FTS alone would miss it unless the tokenizer happens to overlap)
+- Bank scoping is per-cwd: same project directory shares memories, different directory does not see them
+- `--no-session` does NOT suppress mnemopi (session-file persistence and memory persistence are orthogonal concerns; source: `packages/coding-agent/src/mnemopi/backend.ts:70-71` — gate is `sessionId` existence, which `--no-session` still provides via in-memory session)
+
+**Storage architecture note:** On this workstation `memory.backend = mnemopi` is the active setting. Despite the source code resolving to `getMemoriesDir(agentDir)/mnemopi/mnemopi.db`, no SQLite file by that name exists on disk — the retained token was found only inside the current session's JSONL file. The mnemopi implementation on this version may use session-embedded indexing with cross-session FTS against the session archive (under `~/.omp/agent/sessions/<project-slug>/`). The behavioral contract (retain in session A → recall in session B) is what this probe verifies; the internal persistence format is an implementation detail subject to version drift.
+
 ---
 
 ## 4. Known runtime traps
@@ -257,9 +293,10 @@ Record every observed divergence from §3 here. Do NOT edit §3's expected value
 
 Being explicit so the doc is not overclaimed:
 
-- Does NOT verify anything about `mnemopi` (memory) beyond what shows up in `config list`.
+- Does NOT verify `<memories>` auto-injection at session start (only cross-session recall via explicit tool call). Proving injection would require inspecting the system prompt of a fresh subprocess, which is not observable from the outside.
 - Does NOT verify `swarm-extension` behavior (only that it is *loaded* per `~/.omp/config.json`).
 - Does NOT exercise checkpoint restore (`checkpoint.enabled = false` on this workstation).
 - V-10 verifies JSONL persistence but does NOT verify the internal claim from foundation that `#entries` is never pruned — that requires forcing a compaction and inspecting `firstKeptEntryId` semantics; deferred.
+- Does NOT verify the mnemopi embedding pipeline specifically (whether similarity is purely FTS-based or cosine-on-vector); the positive recall could be hitting on shared FTS tokens. A definitive vector-similarity proof would need a query with zero lexical overlap that still hits — deferred.
 
 These are the highest-value next verification tasks; each becomes a new V-N entry when added, per the discipline in §2.
